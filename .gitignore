@@ -1,0 +1,110 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Sensitive files
+*.pem
+*.key
+id_rsa*
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# n8n
+n8n_data/
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Exercise data
+exercises/*/results/
+exercises/*/artifacts/
+*.pcap
+*.pcapng
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.sublime-*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# VM Images (don't commit large files)
+*.iso
+*.qcow2
+*.vmdk
+*.vdi
+
+# Wazuh
+wazuh_data/
+
+# Backup files
+backup/
+*.backup
+
+# Documentation builds
+docs/_build/
+site/
+
+# Proxmox
+proxmox-api-token.txt
+
+# API Keys and tokens (never commit these!)
+*api_key*
+*api_token*
+*access_token*
+*secret_key*

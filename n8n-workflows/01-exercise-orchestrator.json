@@ -1,0 +1,417 @@
+{
+  "name": "Security Exercise Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "start-exercise",
+        "method": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-start",
+      "name": "Webhook - Start Exercise",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "security-exercise-start"
+    },
+    {
+      "parameters": {
+        "content": "=## Security Exercise Started\n\n**Exercise ID**: {{ $json.exercise_id }}\n**Type**: {{ $json.exercise_type }}\n**Start Time**: {{ $now.toISO() }}\n**Duration**: {{ $json.duration_hours }} hours\n\n### Scope\n- Red Team Network: 10.0.10.0/24\n- Target Network: 10.0.30.0/24\n- Rules of Engagement: Active\n\n### Teams Notified\n✅ Red Team\n✅ Blue Team\n✅ Control Team",
+        "options": {}
+      },
+      "id": "generate-exercise-brief",
+      "name": "Generate Exercise Brief",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.PROXMOX_API_URL }}/api2/json/nodes/{{ $env.PROXMOX_NODE }}/qemu",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=PVEAPIToken={{ $env.PROXMOX_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-vm-status",
+      "name": "Check VM Status (Proxmox)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.data.filter(vm => ['110','111','112','130','131','132'].includes(vm.vmid.toString())).every(vm => vm.status === 'running') }}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "verify-vms-running",
+      "name": "Verify VMs Running",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.WAZUH_API_URL }}/security/rules",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WAZUH_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "rule_ids",
+              "value": "[100001,100010,100020]"
+            },
+            {
+              "name": "status",
+              "value": "enabled"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "enable-wazuh-rules",
+      "name": "Enable Wazuh Detection Rules",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.10.110 '/opt/red-team/start-exercise.sh {{ $json.exercise_id }}'",
+        "options": {}
+      },
+      "id": "trigger-red-team",
+      "name": "Trigger Red Team Attack",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "command": "=ssh root@10.0.20.121 '/opt/blue-team/start-monitoring.sh {{ $json.exercise_id }}'",
+        "options": {}
+      },
+      "id": "trigger-blue-team",
+      "name": "Activate Blue Team Monitoring",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "exercise_id",
+              "value": "={{ $('Webhook - Start Exercise').item.json.body.exercise_id }}"
+            },
+            {
+              "name": "status",
+              "value": "active"
+            },
+            {
+              "name": "start_time",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "name": "red_team_ip",
+              "value": "10.0.10.110"
+            },
+            {
+              "name": "blue_team_monitoring",
+              "value": "enabled"
+            },
+            {
+              "name": "wazuh_rules",
+              "value": "active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-exercise-state",
+      "name": "Create Exercise State",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1450, 250]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "write",
+        "fileName": "=/data/exercises/{{ $json.exercise_id }}.json",
+        "fileContent": "={{ JSON.stringify($json, null, 2) }}",
+        "options": {}
+      },
+      "id": "save-exercise-state",
+      "name": "Save Exercise State to Disk",
+      "type": "n8n-nodes-base.n8n-nodes-base.file",
+      "typeVersion": 1,
+      "position": [1650, 250]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "monitor-loop",
+      "name": "Monitor Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 600]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "read",
+        "filePath": "/data/exercises/*.json",
+        "options": {}
+      },
+      "id": "load-active-exercises",
+      "name": "Load Active Exercises",
+      "type": "n8n-nodes-base.n8n-nodes-base.file",
+      "typeVersion": 1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "active"
+            }
+          ]
+        }
+      },
+      "id": "filter-active",
+      "name": "Filter Active Exercises",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 600]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.WAZUH_API_URL }}/security/alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WAZUH_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "rule.groups",
+              "value": "red_team,unauthorized_attack,honeypot"
+            },
+            {
+              "name": "time_range",
+              "value": "5m"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-wazuh-alerts",
+      "name": "Fetch Wazuh Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze alerts and categorize\nconst alerts = $input.item.json.data.affected_items;\nconst exerciseId = $('Load Active Exercises').item.json.exercise_id;\n\nconst analysis = {\n  exercise_id: exerciseId,\n  timestamp: new Date().toISOString(),\n  red_team_detected: false,\n  blue_team_detection_time: null,\n  unauthorized_threats: [],\n  honeypot_interactions: [],\n  scoring: {\n    red_team_objectives: 0,\n    blue_team_detections: 0,\n    penalties: 0\n  }\n};\n\nalerts.forEach(alert => {\n  const srcIp = alert.data?.srcip || 'unknown';\n  const ruleId = alert.rule?.id;\n  const ruleGroups = alert.rule?.groups || [];\n  \n  // Check if Red Team activity\n  if (srcIp.startsWith('10.0.10.')) {\n    if (!analysis.red_team_detected) {\n      analysis.red_team_detected = true;\n      analysis.blue_team_detection_time = alert.timestamp;\n      analysis.scoring.blue_team_detections += 100; // Points for detection\n    }\n  }\n  \n  // Check for unauthorized attacks (Black Hat)\n  else if (ruleGroups.includes('unauthorized_attack')) {\n    analysis.unauthorized_threats.push({\n      source_ip: srcIp,\n      rule_id: ruleId,\n      timestamp: alert.timestamp,\n      severity: alert.rule?.level || 0,\n      description: alert.rule?.description\n    });\n    // Major penalty for missing this\n    if (alert.rule?.level >= 10) {\n      analysis.scoring.penalties -= 1000;\n    }\n  }\n  \n  // Check honeypot interactions\n  else if (ruleGroups.includes('honeypot')) {\n    analysis.honeypot_interactions.push({\n      source_ip: srcIp,\n      honeypot_type: alert.data?.dstip?.includes('150') ? 'ssh' : 'web',\n      timestamp: alert.timestamp\n    });\n  }\n});\n\nreturn { json: analysis };"
+      },
+      "id": "analyze-alerts",
+      "name": "Analyze Alerts (JS)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.unauthorized_threats.length }}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "check-unauthorized-threats",
+      "name": "Check for Unauthorized Threats",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 600]
+    },
+    {
+      "parameters": {
+        "channel": "#security-alerts",
+        "text": "=🚨 **CRITICAL ALERT** 🚨\n\n**Unauthorized Attack Detected!**\n\nThis is NOT part of the Red Team exercise!\n\n**Details:**\n- Exercise ID: {{ $json.exercise_id }}\n- Threat Count: {{ $json.unauthorized_threats.length }}\n- Threats:\n{{ $json.unauthorized_threats.map(t => `  • ${t.source_ip} - ${t.description} (Severity: ${t.severity})`).join('\\n') }}\n\n**Action Required:** Immediate investigation by SOC team!\n\n@security-team @incident-response",
+        "attachments": []
+      },
+      "id": "alert-slack-critical",
+      "name": "Alert Slack - CRITICAL",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "to": "security@company.com",
+        "subject": "=CRITICAL: Unauthorized Attack Detected - {{ $json.exercise_id }}",
+        "text": "=Unauthorized attack detected during security exercise.\n\nNot from Red Team!\n\nSee Slack #security-alerts for details.",
+        "options": {}
+      },
+      "id": "alert-email-critical",
+      "name": "Alert Email - CRITICAL",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1450, 600]
+    },
+    {
+      "parameters": {
+        "command": "=/opt/incident-response/auto-block.sh {{ $json.unauthorized_threats.map(t => t.source_ip).join(' ') }}",
+        "options": {}
+      },
+      "id": "auto-block-threats",
+      "name": "Auto-Block Unauthorized IPs",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1450, 700]
+    },
+    {
+      "parameters": {
+        "channel": "#security-exercises",
+        "text": "=📊 **Exercise Status Update**\n\n**Exercise ID:** {{ $json.exercise_id }}\n**Status:** {{ $json.status }}\n**Elapsed Time:** {{ Math.floor((new Date() - new Date($json.start_time)) / 1000 / 60) }} minutes\n\n**Scoring:**\n🔴 Red Team: {{ $json.scoring.red_team_objectives }} points\n🔵 Blue Team: {{ $json.scoring.blue_team_detections }} points\n⚠️ Penalties: {{ $json.scoring.penalties }} points\n\n**Detection Status:**\n{{ $json.red_team_detected ? '✅ Red Team detected at ' + $json.blue_team_detection_time : '⏳ Red Team still undetected' }}\n\n**Honeypot Activity:** {{ $json.honeypot_interactions.length }} interactions",
+        "attachments": []
+      },
+      "id": "status-update-slack",
+      "name": "Status Update to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1650, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  exercise_id: $json.exercise_id,\n  status: 'started',\n  message: 'Security exercise initiated successfully',\n  endpoints: {\n    status: 'GET /exercise-status/' + $json.exercise_id,\n    stop: 'POST /stop-exercise/' + $json.exercise_id,\n    score: 'GET /exercise-score/' + $json.exercise_id\n  }\n}, null, 2) }}",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 250]
+    }
+  ],
+  "connections": {
+    "Webhook - Start Exercise": {
+      "main": [[{ "node": "Generate Exercise Brief", "type": "main", "index": 0 }]]
+    },
+    "Generate Exercise Brief": {
+      "main": [[{ "node": "Check VM Status (Proxmox)", "type": "main", "index": 0 }]]
+    },
+    "Check VM Status (Proxmox)": {
+      "main": [[{ "node": "Verify VMs Running", "type": "main", "index": 0 }]]
+    },
+    "Verify VMs Running": {
+      "main": [
+        [
+          { "node": "Enable Wazuh Detection Rules", "type": "main", "index": 0 },
+          { "node": "Trigger Red Team Attack", "type": "main", "index": 0 },
+          { "node": "Activate Blue Team Monitoring", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Trigger Red Team Attack": {
+      "main": [[{ "node": "Create Exercise State", "type": "main", "index": 0 }]]
+    },
+    "Activate Blue Team Monitoring": {
+      "main": [[{ "node": "Create Exercise State", "type": "main", "index": 0 }]]
+    },
+    "Create Exercise State": {
+      "main": [[{ "node": "Save Exercise State to Disk", "type": "main", "index": 0 }]]
+    },
+    "Save Exercise State to Disk": {
+      "main": [[{ "node": "Webhook Response", "type": "main", "index": 0 }]]
+    },
+    "Monitor Every 5 Minutes": {
+      "main": [[{ "node": "Load Active Exercises", "type": "main", "index": 0 }]]
+    },
+    "Load Active Exercises": {
+      "main": [[{ "node": "Filter Active Exercises", "type": "main", "index": 0 }]]
+    },
+    "Filter Active Exercises": {
+      "main": [[{ "node": "Fetch Wazuh Alerts", "type": "main", "index": 0 }]]
+    },
+    "Fetch Wazuh Alerts": {
+      "main": [[{ "node": "Analyze Alerts (JS)", "type": "main", "index": 0 }]]
+    },
+    "Analyze Alerts (JS)": {
+      "main": [[{ "node": "Check for Unauthorized Threats", "type": "main", "index": 0 }]]
+    },
+    "Check for Unauthorized Threats": {
+      "main": [
+        [
+          { "node": "Alert Slack - CRITICAL", "type": "main", "index": 0 },
+          { "node": "Alert Email - CRITICAL", "type": "main", "index": 0 },
+          { "node": "Auto-Block Unauthorized IPs", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Status Update to Slack", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-09T00:00:00.000Z",
+  "versionId": "1"
+}
