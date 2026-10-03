@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.svg" alt="sentinel-forge: Red vs Blue team lab with multi-perspective threat detection" width="100%"></p>
+
 # Security Lab: Red vs Blue Team Environment
 
 Automated security testing environment with Red Team (offensive), Blue Team (defensive), Purple Team (collaborative), and Black Hat detection capabilities.
@@ -468,3 +470,8 @@ This is a security testing framework. Use only in authorized environments with p
 ---
 
 **Built with**: Proxmox, Terraform/OpenTofu, n8n, Wazuh, Kali Linux, and a strong cup of coffee ☕
+
+<!-- org-footer -->
+---
+
+<p align="center"><sub>Part of <a href="https://github.com/ry-ops">ry-ops</a> · building the pipes between infrastructure, automation, and observability · built by <a href="https://github.com/ry-ops">ry-ops</a></sub></p>
