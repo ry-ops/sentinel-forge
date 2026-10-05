@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-labelledby="t d">
+  <title id="t">How sentinel-forge is built</title>
+  <desc id="d">n8n orchestrates everything; Terraform provisions the VMs on Proxmox; Wazuh handles detection and response. Four n8n workflows drive the exercise: orchestrator, Red automation, Blue response, and Purple scoring.</desc>
+  <defs><linearGradient id="title" x1="0" x2="1"><stop offset="0" stop-color="#9b59ff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill:#eceef4; }
+    .muted { fill:#8f96a8; } .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    @keyframes c0 { 0%,2.22% { opacity:0; transform:translateY(9px) } 8.89%,100% { opacity:1; transform:translateY(0) } } .c0 { animation:c0 9.0s infinite; }
+    @keyframes c1 { 0%,6.67% { opacity:0; transform:translateY(9px) } 13.33%,100% { opacity:1; transform:translateY(0) } } .c1 { animation:c1 9.0s infinite; }
+    @keyframes c2 { 0%,11.11% { opacity:0; transform:translateY(9px) } 17.78%,100% { opacity:1; transform:translateY(0) } } .c2 { animation:c2 9.0s infinite; }
+    @keyframes c3 { 0%,15.56% { opacity:0; transform:translateY(9px) } 22.22%,100% { opacity:1; transform:translateY(0) } } .c3 { animation:c3 9.0s infinite; }
+    @keyframes c4 { 0%,20.00% { opacity:0; transform:translateY(9px) } 26.67%,100% { opacity:1; transform:translateY(0) } } .c4 { animation:c4 9.0s infinite; }
+    @keyframes c5 { 0%,24.44% { opacity:0; transform:translateY(9px) } 31.11%,100% { opacity:1; transform:translateY(0) } } .c5 { animation:c5 9.0s infinite; }
+    @keyframes c6 { 0%,28.89% { opacity:0; transform:translateY(9px) } 35.56%,100% { opacity:1; transform:translateY(0) } } .c6 { animation:c6 9.0s infinite; }
+    @keyframes c7 { 0%,33.33% { opacity:0; transform:translateY(9px) } 40.00%,100% { opacity:1; transform:translateY(0) } } .c7 { animation:c7 9.0s infinite; }
+    @media (prefers-reduced-motion: reduce) { * { animation:none !important; opacity:1 !important; transform:none !important; } }
+  </style>
+  <rect width="960" height="400" rx="20" fill="#0d0f16"/>
+  <text x="40" y="52" font-size="26" font-weight="800" style="fill:url(#title)">How it's built</text>
+  <text x="42" y="78" font-size="14" class="muted">Orchestrate with n8n · provision with Terraform on Proxmox · detect with Wazuh.</text>
+
+  <!-- orchestration layer -->
+  <g class="c0"><rect x="40" y="100" width="880" height="44" rx="11" fill="#17121f" stroke="#9b59ff" stroke-opacity=".5"/>
+  <text x="60" y="121" font-size="13" font-weight="800" style="fill:#c4a6ff">⚙ n8n — orchestration layer</text>
+  <text x="60" y="138" font-size="10.5" class="muted">exercise scheduling · attack/defense automation · real-time monitoring &amp; alerting</text></g>
+
+  <!-- two columns -->
+  <g class="c1"><rect x="40" y="156" width="425" height="64" rx="11" fill="#141b16" stroke="#7b42bc" stroke-opacity=".45"/>
+  <text x="60" y="179" font-size="13" font-weight="800" style="fill:#b48be6">Terraform / OpenTofu → Proxmox</text>
+  <text x="60" y="198" font-size="10.5" class="muted">provisions Red/Blue/Target/Purple/Honeypot VMs</text>
+  <text x="60" y="213" font-size="10" class="mono muted">VLAN-segmented · no internet for targets</text></g>
+
+  <g class="c2"><rect x="495" y="156" width="425" height="64" rx="11" fill="#101722" stroke="#3b82f6" stroke-opacity=".5"/>
+  <text x="515" y="179" font-size="13" font-weight="800" style="fill:#7cb0ff">Wazuh SIEM — detection &amp; response</text>
+  <text x="515" y="198" font-size="10.5" class="muted">custom rules flag Red activity + Black Hat threats</text>
+  <text x="515" y="213" font-size="10" class="mono muted">webhooks → n8n → active response</text></g>
+
+  <text x="40" y="230" font-size="10.5" font-weight="700" class="muted" style="letter-spacing:.5px">FOUR N8N WORKFLOWS</text>
+  <g class="c4"><rect x="40" y="236" width="425" height="46" rx="10" fill="#14121c" stroke="#9b59ff" stroke-opacity=".45"/>
+  <rect x="40" y="236" width="5" height="46" rx="2.5" fill="#9b59ff"/>
+  <text x="58" y="256" font-size="12.5" font-weight="800" class="mono">01 · Orchestrator</text>
+  <text x="58" y="273" font-size="10" class="muted">webhook /start-exercise · monitors</text></g><g class="c5"><rect x="480" y="236" width="425" height="46" rx="10" fill="#14121c" stroke="#ff4d5e" stroke-opacity=".45"/>
+  <rect x="480" y="236" width="5" height="46" rx="2.5" fill="#ff4d5e"/>
+  <text x="498" y="256" font-size="12.5" font-weight="800" class="mono">02 · Red automation</text>
+  <text x="498" y="273" font-size="10" class="muted">recon→exploit→lateral→exfil phases</text></g><g class="c6"><rect x="40" y="290" width="425" height="46" rx="10" fill="#14121c" stroke="#3b82f6" stroke-opacity=".45"/>
+  <rect x="40" y="290" width="5" height="46" rx="2.5" fill="#3b82f6"/>
+  <text x="58" y="310" font-size="12.5" font-weight="800" class="mono">03 · Blue response</text>
+  <text x="58" y="327" font-size="10" class="muted">on Wazuh alert → block · isolate · forensics</text></g><g class="c7"><rect x="480" y="290" width="425" height="46" rx="10" fill="#14121c" stroke="#c77dff" stroke-opacity=".45"/>
+  <rect x="480" y="290" width="5" height="46" rx="2.5" fill="#c77dff"/>
+  <text x="498" y="310" font-size="12.5" font-weight="800" class="mono">04 · Purple scoring</text>
+  <text x="498" y="327" font-size="10" class="muted">live score · leaderboard · final report</text></g>
+  <text x="40" y="362" font-size="11" class="muted">Exercise types: <tspan style="fill:#cdd6e6">full-spectrum · web-only · container-escape · AD-attack · purple-team walkthrough</tspan>.</text>
+  <text x="40" y="382" font-size="10.5" class="muted">Optional Cortex integration adds LLM-powered attack analysis and natural-language executive reports.</text>
+</svg>
